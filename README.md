@@ -69,6 +69,18 @@ To enable enhanced query rewriting and answer synthesis, add `GROQ_API_KEY` and 
 
 Dense pgvector cosine search and PostgreSQL lexical search each return up to 25 records. Reciprocal Rank Fusion with `k=60` creates a pool of up to 50 records, which is intended for reranking to the best 5 evidence chunks. The initial lexical ranker is `ts_rank_cd`; native PostgreSQL `tsvector` is not BM25.
 
-## Free-Tier Deployment Notes
+## Data Sources Screenshots
 
-Run the API on a small Render or DigitalOcean container and use Supabase's transaction pooler for database access. Configure provider keys only as server-side environment variables. Before public deployment, add rate limiting and source/clinical review for medical content and price freshness.
+![cdsco_banned_drugs](screenshots/cdsco_banned_drugs.png)
+
+![kendra_karnataka](screenshots/kendra_karnataka.png)
+
+![jan_aushadhi_products](screenshots/jan_aushadhi_products.png)
+
+## Output Screenshots
+
+![output1](screenshots/output1.png)
+
+![output2](screenshots/output2.png)
+
+![output3](screenshots/output3.png)
