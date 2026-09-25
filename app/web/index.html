@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Pharma Substitute Intelligence</title>
+  <title>Indian Medicine Source Lookup</title>
   <style>
     :root {
       --ink: #182126;
@@ -67,16 +67,16 @@
     <header>
       <div>
         <div class="kicker">Evidence-led medicine lookup</div>
-        <h1>Find a generic substitute with the facts in view.</h1>
+        <h1>Look up Indian medicine source records.</h1>
       </div>
       <div class="badge">Hybrid RAG · India</div>
     </header>
     <main>
       <section class="search-panel" aria-label="Medicine search">
         <form id="query-form">
-          <label for="query">What medicine or salt are you looking for?</label>
+          <label for="query">Search a product, drug name, banned entry, or Kendra</label>
           <div class="search-row">
-            <input id="query" name="query" type="search" maxlength="500" placeholder="e.g. paracetamol substitute" required autocomplete="off">
+            <input id="query" name="query" type="search" maxlength="500" placeholder="e.g. Paracetamol 500mg tablets" required autocomplete="off">
             <button id="submit" type="submit">Search records</button>
           </div>
           <div id="status" class="status" role="status" aria-live="polite"></div>
@@ -85,13 +85,13 @@
       <section id="answer" class="answer" aria-live="polite">
         <div class="answer-heading">
           <h2>Retrieved intelligence</h2>
-          <div id="confidence" class="confidence"></div>
+          <div id="result-count" class="confidence"></div>
         </div>
         <p id="answer-copy" class="answer-copy"></p>
         <div id="sources" class="sources"></div>
       </section>
     </main>
-    <footer>Reference information only. Confirm substitutions, contraindications, and current prices with a pharmacist or doctor.</footer>
+    <footer>Catalog and document extracts may be outdated or imperfect. This demo cannot determine suitable substitutes, doses, or treatment. Verify current facts with a pharmacist or doctor.</footer>
   </div>
   <script>
     const form = document.getElementById('query-form');
@@ -100,7 +100,7 @@
     const status = document.getElementById('status');
     const answer = document.getElementById('answer');
     const answerCopy = document.getElementById('answer-copy');
-    const confidence = document.getElementById('confidence');
+    const resultCount = document.getElementById('result-count');
     const sources = document.getElementById('sources');
 
     const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (character) => ({
@@ -124,17 +124,17 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || 'The query could not be completed.');
         answerCopy.textContent = data.answer;
-        confidence.textContent = `${Math.round(data.confidence * 100)}% confidence · ${data.sources.length} sources`;
+        resultCount.textContent = `${data.sources.length} source records`;
         sources.innerHTML = data.sources.map((source) => {
           const metadata = source.metadata || {};
           return `<article class="source">
-            <h3 class="source-title">${escapeHtml(metadata.generic_name || 'Medicine record')}</h3>
-            <p class="source-meta">${escapeHtml(metadata.brand_name || 'Brand unavailable')} · ${escapeHtml(metadata.strength || 'Strength unavailable')} ${escapeHtml(metadata.dosage_form || '')}<br>RRF rank ${escapeHtml(metadata.rrf_rank || '')} · dense ${escapeHtml(metadata.dense_rank || '-') } · sparse ${escapeHtml(metadata.sparse_rank || '-')}<br>RRF score ${escapeHtml(metadata.rrf_score || '-')} · Cohere ${escapeHtml(metadata.cohere_relevance_score || '-')}</p>
+            <h3 class="source-title">${escapeHtml(metadata.source_document || 'Source record')}</h3>
+            <p class="source-meta">Source ID: ${escapeHtml(source.source_id)}${metadata.page_number ? ` · page ${escapeHtml(metadata.page_number)}` : ''}<br>RRF rank ${escapeHtml(metadata.rrf_rank || '')} · dense ${escapeHtml(metadata.dense_rank || '-')} · lexical ${escapeHtml(metadata.sparse_rank || '-')}</p>
             <p class="source-text">${escapeHtml(source.content)}</p>
-            <p class="source-meta">Jan Aushadhi MRP: INR ${escapeHtml(metadata.jan_aushadhi_mrp ?? 'unavailable')} · Brand MRP: INR ${escapeHtml(metadata.brand_mrp ?? 'unavailable')}<br>Contraindications: ${escapeHtml(metadata.contraindications || 'Not provided')}</p>
+            <p class="source-meta">${metadata.catalog_import_date ? `Catalog imported: ${escapeHtml(metadata.catalog_import_date)} · source update date unverified` : ''}${metadata.source_url ? `<br><a href="${escapeHtml(metadata.source_url)}" target="_blank" rel="noopener noreferrer">Source link</a>` : ''}</p>
           </article>`;
         }).join('');
-        status.textContent = `Completed · ${data.retrieval.synthesis_mode} synthesis`;
+        status.textContent = `Completed · ${data.sources.length} source records`;
         answer.classList.add('visible');
       } catch (error) {
         status.className = 'status error';

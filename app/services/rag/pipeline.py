@@ -54,7 +54,6 @@ class RagPipeline:
             {
                 "source_id": item_id,
                 "content": payload.get("canonical_text", ""),
-                "confidence": min(1.0, score * (RRF_K + 1)),
                 "metadata": {
                     **{
                         key: value

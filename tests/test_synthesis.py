@@ -6,50 +6,28 @@ from app.services.rag.synthesis import GroundedSynthesizer
 
 
 @pytest.mark.asyncio
-async def test_synthesis_fallback_is_grounded_in_source_metadata() -> None:
+async def test_answer_contains_only_displayed_record_with_source_id() -> None:
     synthesizer = GroundedSynthesizer(GroqProvider(Settings(groq_api_key="")))
     result = await synthesizer.synthesize(
-        "paracetamol substitute",
+        "paracetamol",
         [
             {
-                "content": "generic salt: Paracetamol",
-                "metadata": {
-                    "generic_name": "Paracetamol",
-                    "brand_name": "Calpol 500",
-                    "strength": "500 mg",
-                    "dosage_form": "tablet",
-                    "jan_aushadhi_mrp": 0.5,
-                    "brand_mrp": 2.2,
-                    "contraindications": "Severe liver disease",
-                },
+                "source_id": "jan-aushadhi-123",
+                "content": "Paracetamol 500mg tablets | Pack size: 10's",
+                "metadata": {"source_document": "Jan Aushadhi catalog snapshot"},
             }
         ],
     )
-
-    assert result.mode == "deterministic"
-    assert "Calpol 500" in result.answer
-    assert "Severe liver disease" in result.answer
-
-
-@pytest.mark.asyncio
-async def test_synthesis_reports_empty_evidence() -> None:
-    synthesizer = GroundedSynthesizer(GroqProvider(Settings(groq_api_key="")))
-    result = await synthesizer.synthesize("unknown medicine", [])
-    assert "No medicine records matched" in result.answer
+    assert result.mode == "source-extract"
+    assert "[jan-aushadhi-123]" in result.answer
+    assert "Paracetamol 500mg tablets" in result.answer
+    assert "recommendation" in result.answer
 
 
 @pytest.mark.asyncio
-async def test_synthesis_falls_back_when_groq_fails() -> None:
-    class FailingProvider:
-        api_key = "configured"
-
-        async def complete(self, prompt: str) -> str | None:
-            raise RuntimeError("provider unavailable")
-
-    result = await GroundedSynthesizer(FailingProvider()).synthesize(
-        "paracetamol",
-        [{"content": "generic salt: Paracetamol", "metadata": {"generic_name": "Paracetamol"}}],
+async def test_empty_evidence_abstains() -> None:
+    result = await GroundedSynthesizer(GroqProvider(Settings(groq_api_key=""))).synthesize(
+        "unknown medicine", []
     )
-
-    assert result.mode == "deterministic-fallback"
-    assert "Paracetamol" in result.answer
+    assert "No matching source record" in result.answer
+    assert result.mode == "source-extract"

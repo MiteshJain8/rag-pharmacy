@@ -22,7 +22,8 @@ client = TestClient(app)
 def test_root() -> None:
     response = client.get("/")
     assert response.status_code == 200
-    assert "Pharma Substitute Intelligence" in response.text
+    assert "Indian Medicine Source Lookup" in response.text
+    assert "% confidence" not in response.text
     assert "/api/v1/query" in response.text
 
 
@@ -36,6 +37,7 @@ def test_query_contract() -> None:
     response = client.post("/api/v1/query", json={"query": "paracetamol substitute"})
     assert response.status_code == 200
     assert response.json()["retrieval"]["expanded_queries"] == ["paracetamol substitute"]
+    assert "confidence" not in response.json()
 
 
 def test_query_rejects_blank_text() -> None:

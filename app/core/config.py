@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_env: str = "development"
-    app_name: str = "Indian Pharma Generic Substitute Intelligence Engine"
+    app_name: str = "Indian Pharma Source Lookup"
     app_version: str = "0.1.0"
     supabase_url: str = ""
     supabase_service_role_key: str = ""

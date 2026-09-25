@@ -1,74 +1,54 @@
-# Indian Pharma & Generic Drug Substitute Intelligence Engine
+# Indian Pharma Source Lookup
 
-Standalone FastAPI foundation for hybrid retrieval over Indian medicine and generic-substitution data.
+A portfolio demo for searching an existing Supabase pgvector corpus of Jan Aushadhi catalog records, OpenFDA labels, CDSCO list extracts, and Karnataka Kendra directory extracts. It shows source records, not clinical advice, price quotes, or proof that a medicine is currently available.
 
-## Local Setup
+## Current corpus
 
-Requirements: Python 3.11+ and `uv`.
+The read-only audit on 2026-09-25 found 3,443 `medicines` rows and 2,204 `medicine_chunks` rows, all with embeddings. Four medicine rows are development fixtures and are excluded from public results. No re-ingestion is required for this release. Catalog import dates are not verified publication dates. Existing PDF source URLs point to local files and are hidden in public responses. Some extracted PDF text needs manual source review.
+
+## Run locally
+
+Python 3.11+ and `uv` are recommended:
 
 ```bash
 uv sync
 cp .env.example .env
+# Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env
 uv run pytest
 uv run ruff check .
 uv run uvicorn app.main:app --reload
 ```
 
-The service serves a basic browser UI at `/`, plus `GET /health` and `POST /api/v1/query`. The UI is static HTML served by FastAPI, so it deploys with the same Python container and requires no Node.js build step.
+Open `/` for the UI, `/docs` for the API, `/health` for the process check, and `/ready` for the embedding model plus database check. Keep the service-role key server-side. With Groq and Cohere keys unset, public queries use no paid provider. Optional query expansion and Cohere reranking can be enabled with API keys; do not add them to a public deployment without a usage budget.
 
-## Supabase Setup
+## Retrieval and answer behavior
 
-1. Create or select a Supabase project with the `vector` extension available.
-2. Apply [supabase_schema.sql](supabase_schema.sql) in the SQL editor or through the project's migration workflow.
-3. Set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env`. Keep the service-role key server-side.
-4. Run a dry ingestion first:
+The service embeds the query with `BAAI/bge-small-en-v1.5`, retrieves up to 25 vector matches and 25 PostgreSQL lexical matches, merges them with reciprocal rank fusion, and optionally applies Cohere reranking. Expanded lexical results are now sorted by their best score across rewrites. Queries with no lexical match abstain; this deliberately sacrifices some semantic-only recall. The public answer copies selected source extracts with source IDs. There is no model-generated clinical synthesis or confidence percentage. Direct requests for dosage, substitution, or personal treatment advice are refused.
 
-```bash
-uv run python scripts/ingest_data.py --dry-run
-uv run python scripts/ingest_data.py --batch-size 50
-```
+Source IDs are record identifiers, not verified publication citations. The imported documents may be stale or contain extraction errors. Confirm clinical and regulatory facts against current primary sources.
 
-The first ingestion run downloads the FastEmbed model. The script upserts deterministic fixtures by `source_id`.
+## Evaluation
 
-For larger open datasets, export PMBI/Jan Aushadhi or a reviewed Kaggle CSV/JSON and import it through the normalized loader. Common aliases such as `salt`, `brand`, `company`, `dose`, `form`, and `mrp` are accepted:
+`evaluation/cases.jsonl` fixes 60 source-derived questions: 15 catalog, 10 OpenFDA, 10 CDSCO, 10 Kendra, 10 unsafe clinical, and 5 unrelated. Positive questions have expected record IDs from the audited corpus. The script records recall@5, MRR@5, abstention, citation ID coverage, strict extractive support, warm latency, and provider calls. This is a lookup benchmark, not a medical accuracy study. Run the exact same cases against the previous commit and this version, then compare the results with the corpus checksum recorded in `evaluation/REPORT.md`.
 
 ```bash
-uv run python scripts/ingest_data.py --input ./data/medicines.csv --batch-size 100
+python evaluation/run.py --mode improved --output evaluation/results/improved.json
 ```
 
-For the provided catalog, use the explicit mapping and validate before upload:
+The results directory is ignored by git because it includes full answers. The report contains aggregate evidence and limitations.
 
-```bash
-uv run python scripts/ingest_data.py \
-	--jan-aushadhi-csv ./data/jan_aushadhi_products.csv \
-	--dry-run --preview-rows 3
-```
+## Render deployment
 
-OpenFDA clinical labels can be imported separately. They provide clinical text and provenance, but generally do not provide Indian MRPs, so pricing remains unavailable for those records:
+The Dockerfile installs the app and caches the embedding model in the image. `render.yaml` defines one free web service. In Render, connect this GitHub repository as a Blueprint and set `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` as secret environment variables. Keep Groq and Cohere keys unset for the public demo. Verify `/health`, `/ready`, `/`, and a safe `POST /api/v1/query` request after deployment. The free service can sleep after inactivity, so its first request may be slow. The app has a small single-process rate limit; use a managed shared limit before increasing traffic or replicas.
 
-```bash
-uv run python scripts/ingest_data.py \
-	--openfda-query 'openfda.product_type:"HUMAN OTC DRUG"' \
-	--max-records 1000 --batch-size 100
-```
+Do not run `supabase_schema.sql` against the live corpus as part of this deployment. It is a setup reference for a new database, not a versioned production migration.
 
-Review and deduplicate external records before production import. Do not treat OpenFDA, community datasets, or PMBI catalog values as interchangeable clinical advice; retain source dates and URLs.
+## Source material screenshots
 
-For manually downloaded catalogs and official PDFs, place files in a local directory and run the chunk importer:
+![CDSCO source material](screenshots/cdsco_banned_drugs.png)
 
-```bash
-uv run python scripts/ingest_pdfs.py --input-dir ./data/pdfs --dry-run
-uv run python scripts/ingest_pdfs.py --input-dir ./data/pdfs --batch-size 100
-```
+![Karnataka Kendra source material](screenshots/kendra_karnataka.png)
 
-The two supplied grid PDFs are extracted row-by-row with `pdfplumber`: CDSCO continuation lines are coalesced into one banned-drug entry, and each Karnataka Kendra row keeps its code, name, district, pincode, and address together. Other PDFs use the generic overlapping text fallback. Dry runs print per-file counts plus first/last samples. Apply the updated `supabase_schema.sql` before the first PDF upload.
+![Jan Aushadhi source material](screenshots/jan_aushadhi_products.png)
 
-To enable enhanced query rewriting and answer synthesis, add `GROQ_API_KEY` and `GROQ_MODEL` to `.env`. To enable cross-encoder reranking, add `COHERE_API_KEY` and `COHERE_RERANK_MODEL`. These are optional; the service remains usable with grounded deterministic responses when they are absent or temporarily unavailable.
-
-## Retrieval Design
-
-Dense pgvector cosine search and PostgreSQL lexical search each return up to 25 records. Reciprocal Rank Fusion with `k=60` creates a pool of up to 50 records, which is intended for reranking to the best 5 evidence chunks. The initial lexical ranker is `ts_rank_cd`; native PostgreSQL `tsvector` is not BM25.
-
-## Free-Tier Deployment Notes
-
-Run the API on a small Render or DigitalOcean container and use Supabase's transaction pooler for database access. Configure provider keys only as server-side environment variables. Before public deployment, add rate limiting and source/clinical review for medical content and price freshness.
+The images in `screenshots/output1.png`, `screenshots/output2.png`, and `screenshots/output3.png` show an earlier UI version; use the running app for the current behavior.
