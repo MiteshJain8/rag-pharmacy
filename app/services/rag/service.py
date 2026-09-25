@@ -9,7 +9,7 @@ from functools import lru_cache
 from fastembed import TextEmbedding
 
 from app.core.config import Settings, get_settings
-from app.db.client import get_supabase_client
+from app.db.client import get_readonly_supabase_client
 from app.db.repository import MedicineRepository
 from app.services.rag.canonicalize import validate_embedding
 from app.services.rag.pipeline import RagPipeline, RetrievalResult
@@ -87,7 +87,7 @@ class RagService:
         else:
             queries = [query]
         expansion_ms = round((time.perf_counter() - started) * 1000, 1)
-        repository = MedicineRepository(get_supabase_client())
+        repository = MedicineRepository(get_readonly_supabase_client())
         embeddings = await asyncio.gather(
             *(asyncio.to_thread(self._embed, expanded_query) for expanded_query in queries)
         )

@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 
 from app.api.v1.routes import router as v1_router
 from app.core.config import get_settings
-from app.db.client import get_supabase_client
+from app.db.client import get_readonly_supabase_client
 from app.services.rag.service import get_embedding_model
 
 settings = get_settings()
@@ -28,7 +28,13 @@ async def health() -> dict[str, str]:
 async def ready() -> dict[str, str]:
     try:
         get_embedding_model()
-        rows = get_supabase_client().table("medicines").select("source_id").limit(1).execute()
+        rows = (
+            get_readonly_supabase_client()
+            .table("medicines")
+            .select("source_id")
+            .limit(1)
+            .execute()
+        )
         if not rows.data:
             raise RuntimeError("medicine corpus is empty")
     except Exception as error:

@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     app_name: str = "Indian Pharma Source Lookup"
     app_version: str = "0.1.0"
     supabase_url: str = ""
+    supabase_publishable_key: str = ""
     supabase_service_role_key: str = ""
     supabase_db_url: str = ""
     groq_api_key: str = ""

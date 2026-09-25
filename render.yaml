@@ -9,5 +9,5 @@ services:
         value: production
       - key: SUPABASE_URL
         sync: false
-      - key: SUPABASE_SERVICE_ROLE_KEY
+      - key: SUPABASE_PUBLISHABLE_KEY
         sync: false

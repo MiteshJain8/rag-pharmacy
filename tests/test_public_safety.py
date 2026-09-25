@@ -71,7 +71,7 @@ def test_read_retries_one_transient_disconnect(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_unrelated_query_abstains_on_incidental_word_match(monkeypatch) -> None:
-    monkeypatch.setattr(service_module, "get_supabase_client", lambda: object())
+    monkeypatch.setattr(service_module, "get_readonly_supabase_client", lambda: object())
     monkeypatch.setattr(RagService, "_embed", lambda self, query: [0.0])
     monkeypatch.setattr(
         RagService, "_dense_search", staticmethod(lambda repository, embeddings: [])
