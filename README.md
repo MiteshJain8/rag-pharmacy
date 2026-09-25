@@ -39,7 +39,7 @@ The results directory is ignored by git because it includes full answers. The re
 
 ## Render deployment
 
-The Dockerfile installs the app and caches the embedding model in the image. `render.yaml` defines one free web service. In Render, connect this GitHub repository as a Blueprint and set `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. The public app uses the publishable key with Supabase read policies; keep the service-role key only in a local environment for ingestion scripts. Keep Groq and Cohere keys unset for the public demo. Verify `/health`, `/ready`, `/`, and a safe `POST /api/v1/query` request after deployment. The free service can sleep after inactivity, so its first request may be slow. The app has a small single-process rate limit; use a managed shared limit before increasing traffic or replicas.
+Live demo: [rag-pharmacy.onrender.com](https://rag-pharmacy.onrender.com/). The Dockerfile installs the app and caches the embedding model in the image. `render.yaml` documents a free web service; the live service was created from this GitHub repository on Render Free in Singapore. It uses `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` with Supabase read policies. Keep the service-role key only in a local environment for ingestion scripts. Groq and Cohere keys are unset for the public demo. The free service can sleep after inactivity, so its first request may be slow. The app has a small single-process rate limit; use a managed shared limit before increasing traffic or replicas.
 
 Do not run `supabase_schema.sql` against the live corpus as part of this deployment. It is a setup reference for a new database, not a versioned production migration.
 
