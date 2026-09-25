@@ -1,3 +1,7 @@
+from concurrent.futures import ThreadPoolExecutor
+from threading import Lock
+from time import sleep
+
 import httpx
 import pytest
 
@@ -68,6 +72,28 @@ def test_read_retries_one_transient_disconnect(monkeypatch) -> None:
     request = Request()
     assert MedicineRepository._execute_read(request) == "ok"
     assert request.calls == 2
+
+
+def test_shared_supabase_reads_do_not_overlap() -> None:
+    state_lock = Lock()
+    active = 0
+    peak = 0
+
+    class Request:
+        def execute(self):
+            nonlocal active, peak
+            with state_lock:
+                active += 1
+                peak = max(peak, active)
+            sleep(0.01)
+            with state_lock:
+                active -= 1
+            return "ok"
+
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(MedicineRepository._execute_read, [Request() for _ in range(8)]))
+    assert results == ["ok"] * 8
+    assert peak == 1
 
 
 @pytest.mark.asyncio

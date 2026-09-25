@@ -1,9 +1,12 @@
 import re
+import threading
 import time
 from typing import Any
 
 import httpx
 from supabase import Client
+
+_READ_LOCK = threading.Lock()
 
 
 class MedicineRepository:
@@ -14,7 +17,10 @@ class MedicineRepository:
     def _execute_read(request: Any) -> Any:
         for attempt in range(2):
             try:
-                return request.execute()
+                # Supabase's shared sync HTTP/2 client can corrupt its stream state
+                # when called concurrently from retrieval and readiness threads.
+                with _READ_LOCK:
+                    return request.execute()
             except httpx.TransportError:
                 if attempt:
                     raise
