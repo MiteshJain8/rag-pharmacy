@@ -25,6 +25,21 @@ def percentile(values: list[float], percent: float) -> float | None:
     return round(ordered[lower] + (ordered[upper] - ordered[lower]) * (index - lower), 1)
 
 
+def answer_supported(answer: str, source: dict) -> bool:
+    """Mechanical check that the answer's displayed fact comes from its cited record."""
+    source_id = source["source_id"]
+    if f"[{source_id}]" not in answer:
+        return False
+    content = source["content"]
+    if source_id.startswith("cdsco-"):
+        return content.split("|", 1)[0].removeprefix("Banned Drug Entry ").strip() in answer
+    if source_id.startswith(("jan-aushadhi-", "kendra-")):
+        return content in answer
+    metadata = source.get("metadata", {})
+    name = metadata.get("brand_name") or metadata.get("generic_name") or "This product"
+    return str(name) in answer
+
+
 async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resume: bool) -> None:
     cases = [json.loads(line) for line in CASES.read_text().splitlines() if line.strip()]
     if len(cases) != 60:
@@ -60,17 +75,9 @@ async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resu
             elapsed_ms = round((time.perf_counter() - started) * 1000, 1)
             ids = [source["source_id"] for source in result.sources]
             expected = case.get("expected_source_id")
-            rank = ids.index(expected) + 1 if expected in ids else None
             answer = result.answer
-            citation_complete = all(f"[{source_id}]" in answer for source_id in ids)
-            extractive_support = (
-                all(
-                    source["content"] in answer and f"[{source['source_id']}]" in answer
-                    for source in result.sources
-                )
-                if ids
-                else None
-            )
+            citation_complete = len(ids) == 1 and answer.count(f"[{ids[0]}]") == 1 if ids else None
+            support = answer_supported(answer, result.sources[0]) if len(ids) == 1 else None
             abstained = not ids and ("cannot" in answer.lower() or "no matching" in answer.lower())
             results.append(
                 {
@@ -78,12 +85,12 @@ async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resu
                     "category": case["category"],
                     "query": case["query"],
                     "expected_source_id": expected,
-                    "top_ids": ids,
-                    "hit_at_5": rank is not None if expected else None,
-                    "reciprocal_rank": round(1 / rank, 4) if rank else 0 if expected else None,
+                    "selected_ids": ids,
+                    "exact_selected_source": ids == [expected] if expected else None,
+                    "single_source": len(ids) == 1 if expected else None,
                     "abstained": abstained if case.get("expected_refusal") else None,
                     "citation_complete": citation_complete if ids else None,
-                    "extractive_support": extractive_support,
+                    "answer_supported": support,
                     "answer": answer,
                     "latency_ms": elapsed_ms,
                     "provider_usage": result.retrieval.get("provider_usage", {}),
@@ -95,10 +102,10 @@ async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resu
             results.append({"case": number, "category": case["category"], "error": str(error)})
         status = results[-1].get("error") or "done"
         print(f"{number}/{len(cases)} {case['category']}: {status}", flush=True)
-    positive = [r for r in results if r.get("hit_at_5") is not None]
+    positive = [r for r in results if r.get("exact_selected_source") is not None]
     negative = [r for r in results if r.get("abstained") is not None]
     cited = [r for r in results if r.get("citation_complete") is not None]
-    supported = [r for r in results if r.get("extractive_support") is not None]
+    supported = [r for r in results if r.get("answer_supported") is not None]
     latencies = [r["latency_ms"] for r in results if isinstance(r.get("latency_ms"), (int, float))]
     summary = {
         "mode": mode,
@@ -107,10 +114,12 @@ async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resu
         "cases_completed": len(results) - sum(bool(r.get("error")) for r in results),
         "positive_cases": len(positive),
         "negative_cases": len(negative),
-        "recall_at_5": round(statistics.mean(r["hit_at_5"] for r in positive), 4)
+        "exact_selected_source_rate": round(
+            statistics.mean(r["exact_selected_source"] for r in positive), 4
+        )
         if positive
         else None,
-        "mrr_at_5": round(statistics.mean(r["reciprocal_rank"] for r in positive), 4)
+        "single_source_rate": round(statistics.mean(r["single_source"] for r in positive), 4)
         if positive
         else None,
         "abstention_rate": round(statistics.mean(r["abstained"] for r in negative), 4)
@@ -119,8 +128,8 @@ async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resu
         "citation_id_coverage": round(statistics.mean(r["citation_complete"] for r in cited), 4)
         if cited
         else None,
-        "extractive_support_rate": round(
-            statistics.mean(r["extractive_support"] for r in supported), 4
+        "answer_support_rate": round(
+            statistics.mean(r["answer_supported"] for r in supported), 4
         )
         if supported
         else None,
@@ -144,9 +153,9 @@ async def evaluate(mode: str, limit: int, expand_query: bool, output: Path, resu
         "warm_latency_p50_ms": percentile(latencies[1:], 0.50),
         "warm_latency_p95_ms": percentile(latencies[1:], 0.95),
         "limitations": (
-            "Fixed, source-derived queries; exact target IDs measure lookup quality only. "
-            "Extractive support requires the full source text and ID in the answer; it is "
-            "strict and does not prove medical correctness. First request excluded "
+            "Fixed, source-derived queries; exact selected IDs measure lookup quality only. "
+            "Answer support checks a cited phrase from the selected record; it does not "
+            "prove medical correctness or current validity. First request excluded "
             "from warm latency. Provider charges require current account pricing."
         ),
     }

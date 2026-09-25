@@ -5,7 +5,12 @@ from pydantic import BaseModel, Field, field_validator
 
 class QueryRequest(BaseModel):
     query: str = Field(min_length=2, max_length=500)
-    top_k: int = Field(default=5, ge=1, le=5)
+    top_k: int = Field(
+        default=5,
+        ge=1,
+        le=5,
+        description="Optional reranker shortlist size. The response contains at most one source.",
+    )
     expand_query: bool = False
 
     @field_validator("query")

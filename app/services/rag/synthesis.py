@@ -20,16 +20,23 @@ class GroundedSynthesizer:
     async def synthesize(self, query: str, sources: list[dict]) -> SynthesisResult:
         if not sources:
             return SynthesisResult(
-                "No matching source record was found. This does not establish whether "
+                "No matching source record could be identified unambiguously. "
+                "This does not establish whether "
                 "a medicine is safe or available.",
                 "source-extract",
             )
-        lines = ["Matching source records (not a substitution or treatment recommendation):"]
-        for source in sources:
-            metadata = source.get("metadata", {})
-            label = metadata.get("source_document", "Source record")
-            page = metadata.get("page_number")
-            page_label = f", p. {page}" if page else ""
-            lines.append(f"- [{source['source_id']}] {source['content']} ({label}{page_label})")
-        lines.append("Verify the source and current details with a pharmacist or doctor.")
-        return SynthesisResult("\n".join(lines), "source-extract")
+        source = sources[0]
+        source_id = source["source_id"]
+        content = source["content"]
+        metadata = source.get("metadata", {})
+        if source_id.startswith("cdsco-"):
+            entry = content.split("|", 1)[0].removeprefix("Banned Drug Entry ").strip()
+            answer = f"The CDSCO banned-drug list records {entry} [{source_id}]"
+        elif source_id.startswith("jan-aushadhi-"):
+            answer = f"The Jan Aushadhi catalog snapshot lists {content}. [{source_id}]"
+        elif source_id.startswith("kendra-"):
+            answer = f"The Karnataka Jan Aushadhi Kendra directory lists {content}. [{source_id}]"
+        else:
+            name = metadata.get("brand_name") or metadata.get("generic_name") or "This product"
+            answer = f"An OpenFDA label record lists {name}. [{source_id}]"
+        return SynthesisResult(answer, "single-source")

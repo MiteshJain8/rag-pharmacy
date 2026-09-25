@@ -18,10 +18,33 @@ async def test_answer_contains_only_displayed_record_with_source_id() -> None:
             }
         ],
     )
-    assert result.mode == "source-extract"
+    assert result.mode == "single-source"
     assert "[jan-aushadhi-123]" in result.answer
     assert "Paracetamol 500mg tablets" in result.answer
-    assert "recommendation" in result.answer
+    assert result.answer.count("[jan-aushadhi-123]") == 1
+
+
+@pytest.mark.asyncio
+async def test_answer_does_not_append_unrelated_records() -> None:
+    synthesizer = GroundedSynthesizer(GroqProvider(Settings(groq_api_key="")))
+    result = await synthesizer.synthesize(
+        "CDSCO banned Phenacetin",
+        [
+            {
+                "source_id": "cdsco-banned-8",
+                "content": "Banned Drug Entry #8: Phenacetin. | Gazette Notification",
+                "metadata": {},
+            },
+            {
+                "source_id": "cdsco-banned-289",
+                "content": "Banned Drug Entry #289: Dextromethorphan",
+                "metadata": {},
+            },
+        ],
+    )
+    assert "Phenacetin" in result.answer
+    assert "Dextromethorphan" not in result.answer
+    assert "cdsco-banned-289" not in result.answer
 
 
 @pytest.mark.asyncio

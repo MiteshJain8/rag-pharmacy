@@ -14,6 +14,7 @@ from app.db.repository import MedicineRepository
 from app.services.rag.canonicalize import validate_embedding
 from app.services.rag.pipeline import RagPipeline, RetrievalResult
 from app.services.rag.providers import CohereProvider, GroqProvider
+from app.services.rag.selection import select_source
 from app.services.rag.synthesis import GroundedSynthesizer
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
@@ -172,7 +173,8 @@ class RagService:
                 first,
                 *[s for s in reranked_sources if s["source_id"] != first["source_id"]],
             ]
-        result.sources = reranked_sources[:top_k]
+        selected = select_source(query, reranked_sources)
+        result.sources = [selected] if selected else []
         rerank_ms = round((time.perf_counter() - rerank_started) * 1000, 1)
         result.sources = [self._public_source(source) for source in result.sources]
         synthesis = await self.synthesizer.synthesize(query, result.sources)

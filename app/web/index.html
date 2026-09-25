@@ -84,7 +84,7 @@
       </section>
       <section id="answer" class="answer" aria-live="polite">
         <div class="answer-heading">
-          <h2>Retrieved intelligence</h2>
+          <h2>Answer</h2>
           <div id="result-count" class="confidence"></div>
         </div>
         <p id="answer-copy" class="answer-copy"></p>
@@ -124,17 +124,17 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.detail || 'The query could not be completed.');
         answerCopy.textContent = data.answer;
-        resultCount.textContent = `${data.sources.length} source records`;
+        resultCount.textContent = data.sources.length ? '1 supporting source' : 'No supporting source';
         sources.innerHTML = data.sources.map((source) => {
           const metadata = source.metadata || {};
           return `<article class="source">
             <h3 class="source-title">${escapeHtml(metadata.source_document || 'Source record')}</h3>
-            <p class="source-meta">Source ID: ${escapeHtml(source.source_id)}${metadata.page_number ? ` · page ${escapeHtml(metadata.page_number)}` : ''}<br>RRF rank ${escapeHtml(metadata.rrf_rank || '')} · dense ${escapeHtml(metadata.dense_rank || '-')} · lexical ${escapeHtml(metadata.sparse_rank || '-')}</p>
+            <p class="source-meta">Source ID: ${escapeHtml(source.source_id)}${metadata.page_number ? ` · page ${escapeHtml(metadata.page_number)}` : ''}</p>
             <p class="source-text">${escapeHtml(source.content)}</p>
             <p class="source-meta">${metadata.catalog_import_date ? `Catalog imported: ${escapeHtml(metadata.catalog_import_date)} · source update date unverified` : ''}${metadata.source_url ? `<br><a href="${escapeHtml(metadata.source_url)}" target="_blank" rel="noopener noreferrer">Source link</a>` : ''}</p>
           </article>`;
         }).join('');
-        status.textContent = `Completed · ${data.sources.length} source records`;
+        status.textContent = 'Completed';
         answer.classList.add('visible');
       } catch (error) {
         status.className = 'status error';

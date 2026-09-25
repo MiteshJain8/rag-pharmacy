@@ -1,5 +1,11 @@
 # Source lookup evaluation — 2026-09-25
 
+## Single-answer revision
+
+The public response now contains one answer and at most one supporting source. On the same fixed 60 questions, with Groq and Cohere disabled, 44/45 positive queries selected the expected record ID, 45/45 returned exactly one source, and 15/15 unsafe or unrelated queries returned no source. All 45 cited answers passed a mechanical check that the displayed fact came from the cited record. Warm local query latency was p50 512.3 ms and p95 765.1 ms, excluding the first request; provider calls were zero. These are local sequential measurements against the existing Supabase corpus, not Render latency or a clinical review.
+
+The one exact-ID miss was “Guaifenesin and Dextromethorphan HBr label.” Two OpenFDA records have the same displayed generic name, brand, and manufacturer; the query cannot distinguish their source IDs. The selected record still supported the answer. The earlier top-five recall below measures whether the target appeared anywhere in five results, so it is not directly comparable with the new exact selected-record measure. The database content was not modified by this run; a fresh checksum was not taken for this revision.
+
 ## Corpus and method
 
 The live Supabase audit found 3,443 `medicines` records and 2,204 `medicine_chunks` records, all 5,647 with embeddings. The 60 fixed questions in `cases.jsonl` comprise 45 exact-record lookups (15 Jan Aushadhi, 10 OpenFDA, 10 CDSCO, 10 Kendra), 10 personal medical advice requests, and 5 unrelated requests. Positive target IDs were checked against sampled live records; the questions are source-derived, not independent user queries. The same file and database were used for both runs. Neither run wrote to Supabase.

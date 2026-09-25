@@ -23,13 +23,13 @@ Open `/` for the UI, `/docs` for the API, `/health` for the process check, and `
 
 ## Retrieval and answer behavior
 
-The service embeds the query with `BAAI/bge-small-en-v1.5`, retrieves up to 25 vector matches and 25 PostgreSQL lexical matches, merges them with reciprocal rank fusion, and optionally applies Cohere reranking. Expanded lexical results are now sorted by their best score across rewrites. Queries with no lexical match abstain; this deliberately sacrifices some semantic-only recall. The public answer copies selected source extracts with source IDs. There is no model-generated clinical synthesis or confidence percentage. Direct requests for dosage, substitution, or personal treatment advice are refused.
+The service embeds the query with `BAAI/bge-small-en-v1.5`, retrieves up to 25 vector matches and 25 PostgreSQL lexical matches, merges them with reciprocal rank fusion, and optionally applies Cohere reranking. Expanded lexical results are sorted by their best score across rewrites. A direct name or code match selects one source for the public answer; weak matches abstain. For CDSCO entries, matching uses the drug entry rather than shared Gazette text, and prefers the combination without extra ingredients. The API returns at most one source card. There is no model-generated clinical synthesis or confidence percentage. Direct requests for dosage, substitution, or personal treatment advice are refused.
 
 Source IDs are record identifiers, not verified publication citations. The imported documents may be stale or contain extraction errors. Confirm clinical and regulatory facts against current primary sources.
 
 ## Evaluation
 
-`evaluation/cases.jsonl` fixes 60 source-derived questions: 15 catalog, 10 OpenFDA, 10 CDSCO, 10 Kendra, 10 unsafe clinical, and 5 unrelated. Positive questions have expected record IDs from the audited corpus. The script records recall@5, MRR@5, abstention, citation ID coverage, strict extractive support, warm latency, and provider calls. This is a lookup benchmark, not a medical accuracy study. Run the exact same cases against the previous commit and this version, then compare the results with the corpus checksum recorded in `evaluation/REPORT.md`.
+`evaluation/cases.jsonl` fixes 60 source-derived questions: 15 catalog, 10 OpenFDA, 10 CDSCO, 10 Kendra, 10 unsafe clinical, and 5 unrelated. Positive questions have expected record IDs from the audited corpus. The script records exact selected record rate, single-source output rate, abstention, citation ID coverage, mechanical answer support, warm latency, and provider calls. This is a lookup benchmark, not a medical accuracy study. Compare runs using the same database content and the fixed cases in `evaluation/REPORT.md`.
 
 ```bash
 python evaluation/run.py --mode improved --output evaluation/results/improved.json
