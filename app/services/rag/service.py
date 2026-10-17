@@ -63,6 +63,25 @@ def get_embedding_model() -> TextEmbedding:
     return TextEmbedding(model_name=MODEL_NAME, cache_dir=cache_dir)
 
 
+def _exact_named_source_match(query: str, row: dict) -> bool:
+    """Permit a bare name only when it identifies a named record, not incidental text."""
+    compact_query = "".join(re.findall(r"[a-z0-9]+", query.lower()))
+    if not compact_query:
+        return False
+    source_id = str(row.get("source_id", ""))
+    text = str(row.get("canonical_text", ""))
+    metadata_names = (row.get("generic_name"), row.get("brand_name"))
+    candidates = [str(name) for name in metadata_names if name]
+    if source_id.startswith("cdsco-"):
+        candidates.append(text.split("|", 1)[0].split(":", 1)[-1].strip())
+    elif source_id.startswith("kendra-"):
+        candidates.append(source_id.removeprefix("kendra-karnataka-"))
+    return any(
+        "".join(re.findall(r"[a-z0-9]+", name.lower())) == compact_query
+        for name in candidates
+    )
+
+
 class RagService:
     def __init__(self, settings: Settings | None = None) -> None:
         self.settings = settings or get_settings()
@@ -158,7 +177,12 @@ class RagService:
             ),
             default=0,
         )
-        if not sparse_results or (not DOMAIN_MARKER.search(query) and best_overlap < 2):
+        exact_named_match = any(
+            _exact_named_source_match(query, row) for row in sparse_results
+        )
+        if not sparse_results or (
+            not DOMAIN_MARKER.search(query) and best_overlap < 2 and not exact_named_match
+        ):
             return RetrievalResult(
                 answer="No matching source record was found. This does not establish whether "
                 "a medicine is safe or available.",

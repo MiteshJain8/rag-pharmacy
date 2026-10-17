@@ -5,10 +5,11 @@ from time import sleep
 import httpx
 import pytest
 
+from app.core.config import Settings
 from app.db.repository import MedicineRepository
 from app.services.rag import service as service_module
 from app.services.rag.selection import select_source
-from app.services.rag.service import RagService
+from app.services.rag.service import RagService, _exact_named_source_match
 
 
 @pytest.mark.asyncio
@@ -130,6 +131,47 @@ async def test_unrelated_query_abstains_on_incidental_word_match(monkeypatch) ->
     assert result.retrieval["synthesis_mode"] == "abstain-no-lexical-match"
 
 
+def test_bare_drug_name_must_match_named_entry() -> None:
+    nialamide = {
+        "source_id": "cdsco-banned-20",
+        "canonical_text": "Banned Drug Entry #20: Nialamide. | Gazette Notification",
+    }
+    incidental = {
+        "source_id": "cdsco-banned-8",
+        "canonical_text": "Banned Drug Entry #8: Phenacetin. | Imported from France",
+    }
+    assert _exact_named_source_match("Nialamide", nialamide)
+    assert not _exact_named_source_match("France", incidental)
+
+
+@pytest.mark.asyncio
+async def test_bare_named_drug_returns_its_source(monkeypatch) -> None:
+    record = {
+        "source_id": "cdsco-banned-20",
+        "canonical_text": "Banned Drug Entry #20: Nialamide. | Gazette Notification",
+        "lexical_score": 0.1,
+    }
+
+    class Repository:
+        def __init__(self, client) -> None:
+            pass
+
+    monkeypatch.setattr(service_module, "get_readonly_supabase_client", lambda: object())
+    monkeypatch.setattr(service_module, "MedicineRepository", Repository)
+    monkeypatch.setattr(RagService, "_embed", lambda self, query: [0.0])
+    monkeypatch.setattr(
+        RagService, "_dense_search", staticmethod(lambda repository, embeddings: [])
+    )
+    monkeypatch.setattr(
+        RagService, "_sparse_search", staticmethod(lambda repository, queries: [record])
+    )
+    result = await RagService(Settings(groq_api_key="", cohere_api_key="")).query(
+        "Nialamide", 5, False
+    )
+    assert [source["source_id"] for source in result.sources] == ["cdsco-banned-20"]
+    assert "Nialamide" in result.answer
+
+
 def test_cdsco_selection_uses_drug_name_not_shared_gazette_text() -> None:
     wrong = {
         "source_id": "cdsco-banned-289",
@@ -159,6 +201,23 @@ def test_single_ingredient_with_multiple_banned_combinations_abstains() -> None:
         },
     ]
     assert select_source("CDSCO banned Paracetamol", records) is None
+
+
+def test_strength_must_belong_to_queried_ingredient() -> None:
+    wrong = {
+        "source_id": "jan-aushadhi-650",
+        "content": "Mefenamic Acid 500mg and Paracetamol 325mg Tablets",
+        "metadata": {},
+    }
+    assert select_source("Jan Aushadhi Paracetamol 500mg tablets", [wrong]) is None
+    extra_ingredients = {
+        "source_id": "jan-aushadhi-2400",
+        "content": "Paracetamol 500mg",
+        "metadata": {
+            "generic_name": "Caffeine 30mg + Diphenhydramine 25mg + Paracetamol 500mg Tablets"
+        },
+    }
+    assert select_source("Jan Aushadhi Paracetamol 500mg tablets", [extra_ingredients]) is None
 
 
 @pytest.mark.asyncio

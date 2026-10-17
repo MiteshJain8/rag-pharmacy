@@ -19,6 +19,13 @@ def _compact(value: str) -> str:
     return "".join(re.findall(r"[a-z0-9]+", value.lower()))
 
 
+def _strength_pairs(value: str) -> list[tuple[str, str, str]]:
+    return re.findall(
+        r"\b([a-z][a-z-]+)\s+(\d+(?:\.\d+)?)\s*(mg|mcg|g)\b",
+        value.lower(),
+    )
+
+
 def select_source(query: str, sources: list[dict]) -> dict | None:
     """Prefer a direct name/code match, using retrieval order only to break ties."""
     wanted = _terms(query) - QUERY_WORDS
@@ -37,7 +44,20 @@ def select_source(query: str, sources: list[dict]) -> dict | None:
         metadata = source.get("metadata", {})
         generic_name = str(metadata.get("generic_name") or "")
         brand_name = str(metadata.get("brand_name") or "")
+        if source_id.startswith("jan-aushadhi-") and re.search(
+            r"\s(?:and|\+)\s", generic_name, re.I
+        ) and not re.search(r"\b(?:and|with)\b|\+", query, re.I):
+            continue
         searchable = " ".join((source_id, content, generic_name, brand_name))
+        if any(
+            not re.search(
+                rf"\b{re.escape(name)}\s+{re.escape(amount)}\s*{unit}\b",
+                searchable,
+                re.I,
+            )
+            for name, amount, unit in _strength_pairs(query)
+        ):
+            continue
         terms = _terms(searchable)
         compact = _compact(searchable)
         matched = {word for word in wanted if word in terms or (is_cdsco and word in compact)}
