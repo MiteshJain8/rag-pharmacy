@@ -5,6 +5,7 @@ import os
 import re
 import time
 from functools import lru_cache
+from pathlib import Path
 
 from fastembed import TextEmbedding
 
@@ -56,7 +57,10 @@ STOP_WORDS = {
 
 @lru_cache
 def get_embedding_model() -> TextEmbedding:
-    return TextEmbedding(model_name=MODEL_NAME, cache_dir=os.getenv("FASTEMBED_CACHE_DIR"))
+    cache_dir = os.getenv("FASTEMBED_CACHE_DIR")
+    if not cache_dir and os.getenv("VERCEL"):
+        cache_dir = str(Path(__file__).resolve().parents[3] / "model_cache")
+    return TextEmbedding(model_name=MODEL_NAME, cache_dir=cache_dir)
 
 
 class RagService:

@@ -37,6 +37,10 @@ python evaluation/run.py --mode improved --output evaluation/results/improved.js
 
 The results directory is ignored by git because it includes full answers. The report contains aggregate evidence and limitations.
 
+## Vercel deployment
+
+Vercel runs the FastAPI app as a Python function. The build downloads the embedding model into the function bundle to avoid downloading it on a cold request. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `APP_ENV=production` in the Vercel project for production and preview. Do not set the service-role key. Check `/ready` and a source-backed lookup after each deployment. Vercel Hobby serves requests without Render's idle suspension, but functions can still have cold starts and the free plan has usage limits.
+
 ## Render deployment
 
 Live demo: [rag-pharmacy.onrender.com](https://rag-pharmacy.onrender.com/). The Dockerfile installs the app and caches the embedding model in the image. `render.yaml` documents a free web service; the live service was created from this GitHub repository on Render Free in Singapore. It uses `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` with Supabase read policies. Keep the service-role key only in a local environment for ingestion scripts. Groq and Cohere keys are unset for the public demo. The free service can sleep after inactivity, so its first request may be slow. The app has a small single-process rate limit; use a managed shared limit before increasing traffic or replicas.
