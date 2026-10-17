@@ -12,10 +12,7 @@ dependencies = [
     "fastembed==0.8.0",
     "httpx==0.28.1",
     "pydantic-settings==2.10.1",
-    "pdfplumber==0.11.7",
-    "pypdf==6.0.0",
     "supabase==2.18.1",
-    "uvicorn[standard]==0.35.0",
 ]
 
 [project.optional-dependencies]
@@ -23,13 +20,11 @@ dev = [
     "pytest==8.4.1",
     "pytest-asyncio==1.1.0",
     "ruff==0.12.9",
+    "uvicorn[standard]==0.35.0",
 ]
-
-[dependency-groups]
-dev = [
-    "pytest==8.4.1",
-    "pytest-asyncio==1.1.0",
-    "ruff==0.12.9",
+ingest = [
+    "pdfplumber==0.11.7",
+    "pypdf==6.0.0",
 ]
 
 [tool.pytest.ini_options]

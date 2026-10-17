@@ -11,13 +11,15 @@ The read-only audit on 2026-09-25 found 3,443 `medicines` rows and 2,204 `medici
 Python 3.11+ and `uv` are recommended:
 
 ```bash
-uv sync
+uv sync --extra dev
 cp .env.example .env
 # Set SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY in .env for queries
-uv run pytest
-uv run ruff check .
-uv run uvicorn app.main:app --reload
+uv run --extra dev pytest
+uv run --extra dev ruff check .
+uv run --extra dev uvicorn app.main:app --reload
 ```
+
+PDF ingestion scripts additionally need `uv sync --extra dev --extra ingest`. These packages are excluded from the hosted web app to keep the Vercel function small.
 
 Open `/` for the UI, `/docs` for the API, `/health` for the process check, and `/ready` for the embedding model plus database check. Keep the service-role key server-side. With Groq and Cohere keys unset, public queries use no paid provider. `GROQ_API_KEY` enables guarded answer wording and optional query expansion; `COHERE_API_KEY` enables reranking. Set provider usage limits before adding keys to a public deployment.
 
