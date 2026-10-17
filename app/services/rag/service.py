@@ -16,7 +16,7 @@ from app.services.rag.canonicalize import validate_embedding
 from app.services.rag.pipeline import RagPipeline, RetrievalResult
 from app.services.rag.providers import CohereProvider, GroqProvider
 from app.services.rag.selection import select_source
-from app.services.rag.synthesis import GroundedSynthesizer
+from app.services.rag.synthesis import GroundedSynthesizer, _instruction_like
 
 MODEL_NAME = "BAAI/bge-small-en-v1.5"
 CLINICAL_REQUEST = re.compile(
@@ -81,6 +81,15 @@ class RagService:
                 ),
                 sources=[],
                 retrieval={"safety_refusal": True, "elapsed_ms": 0},
+            )
+        if _instruction_like(query):
+            return RetrievalResult(
+                answer=(
+                    "I can only look up pharmacy source records. "
+                    "Please ask about a specific record."
+                ),
+                sources=[],
+                retrieval={"instruction_refusal": True, "elapsed_ms": 0},
             )
         expansion_failed = False
         if expand_query:
@@ -181,6 +190,8 @@ class RagService:
         result.sources = [selected] if selected else []
         rerank_ms = round((time.perf_counter() - rerank_started) * 1000, 1)
         result.sources = [self._public_source(source) for source in result.sources]
+        if result.sources and _instruction_like(result.sources[0]["content"]):
+            result.sources = []
         synthesis = await self.synthesizer.synthesize(query, result.sources)
         result.answer = synthesis.answer
         result.retrieval["expanded_queries"] = queries

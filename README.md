@@ -19,11 +19,11 @@ uv run ruff check .
 uv run uvicorn app.main:app --reload
 ```
 
-Open `/` for the UI, `/docs` for the API, `/health` for the process check, and `/ready` for the embedding model plus database check. Keep the service-role key server-side. With Groq and Cohere keys unset, public queries use no paid provider. Optional query expansion and Cohere reranking can be enabled with API keys; do not add them to a public deployment without a usage budget.
+Open `/` for the UI, `/docs` for the API, `/health` for the process check, and `/ready` for the embedding model plus database check. Keep the service-role key server-side. With Groq and Cohere keys unset, public queries use no paid provider. `GROQ_API_KEY` enables guarded answer wording and optional query expansion; `COHERE_API_KEY` enables reranking. Set provider usage limits before adding keys to a public deployment.
 
 ## Retrieval and answer behavior
 
-The service embeds the query with `BAAI/bge-small-en-v1.5`, retrieves up to 25 vector matches and 25 PostgreSQL lexical matches, merges them with reciprocal rank fusion, and optionally applies Cohere reranking. Expanded lexical results are sorted by their best score across rewrites. A direct name or code match selects one source for the public answer; weak matches abstain. For CDSCO entries, matching uses the drug entry rather than shared Gazette text, and prefers the combination without extra ingredients. The API returns at most one source card. There is no model-generated clinical synthesis or confidence percentage. Direct requests for dosage, substitution, or personal treatment advice are refused.
+The service embeds the query with `BAAI/bge-small-en-v1.5`, retrieves up to 25 vector matches and 25 PostgreSQL lexical matches, merges them with reciprocal rank fusion, and optionally applies Cohere reranking. Expanded lexical results are sorted by their best score across rewrites. A direct name or code match selects one source for the public answer; weak matches abstain. For CDSCO entries, matching uses the drug entry rather than shared Gazette text, and prefers the combination without extra ingredients. The API returns at most one source card. When Groq is configured, it sees only the vetted one-source fact, not the query or raw record; an unsupported rewrite falls back to the fixed sentence. Common prompt-injection instructions are rejected before retrieval. This is a safeguard, not a guarantee against every adversarial phrasing. Direct requests for dosage, substitution, or personal treatment advice are refused.
 
 Source IDs are record identifiers, not verified publication citations. The imported documents may be stale or contain extraction errors. Confirm clinical and regulatory facts against current primary sources.
 
@@ -39,7 +39,7 @@ The results directory is ignored by git because it includes full answers. The re
 
 ## Vercel deployment
 
-Vercel runs the FastAPI app as a Python function. The build downloads the embedding model into the function bundle to avoid downloading it on a cold request. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `APP_ENV=production` in the Vercel project for production and preview. Do not set the service-role key. Check `/ready` and a source-backed lookup after each deployment. Vercel Hobby serves requests without Render's idle suspension, but functions can still have cold starts and the free plan has usage limits.
+Vercel runs the FastAPI app as a Python function. The build downloads the embedding model into the function bundle to avoid downloading it on a cold request. Set `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `APP_ENV=production` in the Vercel project for production and preview. Add `GROQ_API_KEY` and `COHERE_API_KEY` only if you want provider calls; the default Groq model is `llama-3.1-8b-instant` and the default Cohere model is `rerank-v3.5`. Do not set the service-role key. Check `/ready` and a source-backed lookup after each deployment. Vercel Hobby serves requests without Render's idle suspension, but functions can still have cold starts and the free plan has usage limits.
 
 ## Render deployment
 
